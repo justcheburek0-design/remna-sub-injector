@@ -1,0 +1,1 @@
+hysteria2://AVM7esxhJVg3s93Ov8oGVIRQ@h2.envymoon.space:7443?sni=h2.envymoon.space&insecure=0&allowInsecure=0&obfs=salamander&obfs-password=AVM7esxhJVg3s93Ov8oGVIRQad#Hysteria2-maxspeed

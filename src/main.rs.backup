@@ -92,19 +92,8 @@ pub fn inject_links(body: &[u8], extra: &str) -> Vec<u8> {
         Ok(t) => t,
         Err(_) => return body.to_vec(),
     };
-    let mut lines: Vec<&str> = text.trim().lines().collect();
-    let combined = if lines.len() > 0 {
-        let last = lines.pop().unwrap();
-        lines.push(extra.trim());
-        lines.push(last);
-        lines.join("
-")
-    } else {
-        format!("{}
-{}", text.trim(), extra)
-    };
+    let combined = format!("{}\n{}", text.trim(), extra);
     STANDARD.encode(combined.as_bytes()).into_bytes()
-
 }
 
 const MAX_BODY_SIZE: u64 = 10 * 1024 * 1024; // 10 MB

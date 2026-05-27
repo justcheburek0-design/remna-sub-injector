@@ -32,13 +32,15 @@ pub struct AppState {
 }
 
 pub fn load_config(path: &str) -> FileConfig {
-    let content = fs::read_to_string(path)
-        .unwrap_or_else(|e| panic!("Cannot read config file {path}: {e}"));
-    toml::from_str(&content)
-        .unwrap_or_else(|e| panic!("Invalid config file {path}: {e}"))
+    let content =
+        fs::read_to_string(path).unwrap_or_else(|e| panic!("Cannot read config file {path}: {e}"));
+    toml::from_str(&content).unwrap_or_else(|e| panic!("Invalid config file {path}: {e}"))
 }
 
-pub fn find_matching_rule<'a>(headers: &HeaderMap, rules: &'a [InjectionRule]) -> Option<&'a InjectionRule> {
+pub fn find_matching_rule<'a>(
+    headers: &HeaderMap,
+    rules: &'a [InjectionRule],
+) -> Option<&'a InjectionRule> {
     for rule in rules {
         let header_name = rule.header.to_lowercase();
         let header_val = headers
@@ -46,7 +48,11 @@ pub fn find_matching_rule<'a>(headers: &HeaderMap, rules: &'a [InjectionRule]) -
             .and_then(|v| v.to_str().ok())
             .unwrap_or("")
             .to_lowercase();
-        if rule.contains.iter().any(|pat| header_val.contains(pat.as_str())) {
+        if rule
+            .contains
+            .iter()
+            .any(|pat| header_val.contains(pat.as_str()))
+        {
             return Some(rule);
         }
     }
@@ -83,7 +89,11 @@ pub async fn load_extra_links_from_source(source: &str, client: &reqwest::Client
 
 pub fn inject_links(body: &[u8], extra: &str) -> Vec<u8> {
     // Strip whitespace (newlines) before decoding — some upstreams wrap base64 at 76 chars
-    let stripped: Vec<u8> = body.iter().copied().filter(|b| !b.is_ascii_whitespace()).collect();
+    let stripped: Vec<u8> = body
+        .iter()
+        .copied()
+        .filter(|b| !b.is_ascii_whitespace())
+        .collect();
     let decoded = match STANDARD.decode(&stripped) {
         Ok(d) => d,
         Err(_) => return body.to_vec(),
@@ -97,14 +107,19 @@ pub fn inject_links(body: &[u8], extra: &str) -> Vec<u8> {
         let last = lines.pop().unwrap();
         lines.push(extra.trim());
         lines.push(last);
-        lines.join("
-")
+        lines.join(
+            "
+",
+        )
     } else {
-        format!("{}
-{}", text.trim(), extra)
+        format!(
+            "{}
+{}",
+            text.trim(),
+            extra
+        )
     };
     STANDARD.encode(combined.as_bytes()).into_bytes()
-
 }
 
 const MAX_BODY_SIZE: u64 = 10 * 1024 * 1024; // 10 MB
@@ -120,10 +135,25 @@ pub async fn proxy(
         uri.path_and_query().map(|pq| pq.as_str()).unwrap_or("/")
     );
 
-    let path = uri.path_and_query().map(|pq| pq.as_str()).unwrap_or("/").to_string();
-    let ua_preview = headers.get("user-agent").and_then(|v| v.to_str().ok()).unwrap_or("").chars().take(40).collect::<String>();
+    let path = uri
+        .path_and_query()
+        .map(|pq| pq.as_str())
+        .unwrap_or("/")
+        .to_string();
+    let ua_preview = headers
+        .get("user-agent")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("")
+        .chars()
+        .take(40)
+        .collect::<String>();
     // Log only the first two path segments to avoid leaking subscription tokens
-    let path_preview = uri.path().splitn(4, '/').take(3).collect::<Vec<_>>().join("/");
+    let path_preview = uri
+        .path()
+        .splitn(4, '/')
+        .take(3)
+        .collect::<Vec<_>>()
+        .join("/");
     eprintln!("[sub-injector] >> GET {path_preview}/... ua={ua_preview:?}");
 
     let mut req = cfg.client.get(&upstream_url);
@@ -166,7 +196,9 @@ pub async fn proxy(
     let matched_rule = find_matching_rule(&headers, &cfg.injections);
     eprintln!(
         "[sub-injector] matched_rule={} ct={content_type:?} body_len={}",
-        matched_rule.map(|r| r.links_source.as_str()).unwrap_or("none"),
+        matched_rule
+            .map(|r| r.links_source.as_str())
+            .unwrap_or("none"),
         body_bytes.len()
     );
 
@@ -191,8 +223,12 @@ pub async fn proxy(
     // Hop-by-hop headers that must not be forwarded; also skip content-length
     // since reqwest decompresses the body (making the original length wrong)
     const SKIP: &[&str] = &[
-        "connection", "transfer-encoding", "trailer",
-        "upgrade", "keep-alive", "content-length",
+        "connection",
+        "transfer-encoding",
+        "trailer",
+        "upgrade",
+        "keep-alive",
+        "content-length",
     ];
 
     let mut response = Response::builder().status(status.as_u16());
@@ -221,7 +257,9 @@ pub fn build_app(cfg: Arc<AppState>) -> Router {
 async fn main() {
     let config_path = env::var("CONFIG_FILE").unwrap_or_else(|_| "config.toml".to_string());
     let file_cfg = load_config(&config_path);
-    let bind_addr = file_cfg.bind_addr.unwrap_or_else(|| "0.0.0.0:3020".to_string());
+    let bind_addr = file_cfg
+        .bind_addr
+        .unwrap_or_else(|| "0.0.0.0:3020".to_string());
 
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(10))
@@ -237,11 +275,12 @@ async fn main() {
 
     let app = build_app(cfg);
 
-    let listener = TcpListener::bind(&bind_addr)
-        .await
-        .expect("Failed to bind");
+    let listener = TcpListener::bind(&bind_addr).await.expect("Failed to bind");
 
-    println!("sub-injector v{} listening on {bind_addr}", env!("CARGO_PKG_VERSION"));
+    println!(
+        "sub-injector v{} listening on {bind_addr}",
+        env!("CARGO_PKG_VERSION")
+    );
     axum::serve(listener, app).await.unwrap();
 }
 
@@ -267,23 +306,35 @@ mod tests {
     }
 
     fn write_temp_file(content: &str) -> String {
-        let path = std::env::temp_dir().join(format!("test-extra-links-{}-{}.txt", std::process::id(), rand_suffix()));
+        let path = std::env::temp_dir().join(format!(
+            "test-extra-links-{}-{}.txt",
+            std::process::id(),
+            rand_suffix()
+        ));
         fs::write(&path, content).unwrap();
         path.to_str().unwrap().to_string()
     }
 
     fn rand_suffix() -> u64 {
         use std::time::{SystemTime, UNIX_EPOCH};
-        SystemTime::now().duration_since(UNIX_EPOCH).unwrap().subsec_nanos() as u64
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .subsec_nanos() as u64
     }
 
     fn hy2_rules(links_source: &str) -> Vec<InjectionRule> {
         vec![InjectionRule {
             header: "User-Agent".to_string(),
             contains: vec![
-                "happ".to_string(), "hiddify".to_string(), "nekobox".to_string(),
-                "nekoray".to_string(), "sing-box".to_string(), "clash.meta".to_string(),
-                "mihomo".to_string(), "v2rayng".to_string(),
+                "happ".to_string(),
+                "hiddify".to_string(),
+                "nekobox".to_string(),
+                "nekoray".to_string(),
+                "sing-box".to_string(),
+                "clash.meta".to_string(),
+                "mihomo".to_string(),
+                "v2rayng".to_string(),
             ],
             links_source: links_source.to_string(),
         }]
@@ -335,10 +386,21 @@ mod tests {
     fn ua_matching_compatible() {
         let rules = hy2_rules("/tmp/fake.txt");
         let mut headers = HeaderMap::new();
-        for ua in &["happ/2.0", "Hiddify/1.5", "NekoBox/3.0", "sing-box/1.0",
-                    "clash.meta/1.18", "Mihomo/1.0", "v2rayng/1.8", "NekoRay/3.0"] {
+        for ua in &[
+            "happ/2.0",
+            "Hiddify/1.5",
+            "NekoBox/3.0",
+            "sing-box/1.0",
+            "clash.meta/1.18",
+            "Mihomo/1.0",
+            "v2rayng/1.8",
+            "NekoRay/3.0",
+        ] {
             headers.insert("user-agent", ua.parse().unwrap());
-            assert!(find_matching_rule(&headers, &rules).is_some(), "{ua} should match");
+            assert!(
+                find_matching_rule(&headers, &rules).is_some(),
+                "{ua} should match"
+            );
         }
     }
 
@@ -346,10 +408,19 @@ mod tests {
     fn ua_matching_incompatible() {
         let rules = hy2_rules("/tmp/fake.txt");
         let mut headers = HeaderMap::new();
-        for ua in &["Shadowrocket/1.0", "Surge/5.0", "QuantumultX", "curl/8.0",
-                    "Mozilla/5.0", "clash/1.0"] {
+        for ua in &[
+            "Shadowrocket/1.0",
+            "Surge/5.0",
+            "QuantumultX",
+            "curl/8.0",
+            "Mozilla/5.0",
+            "clash/1.0",
+        ] {
             headers.insert("user-agent", ua.parse().unwrap());
-            assert!(find_matching_rule(&headers, &rules).is_none(), "{ua} should NOT match");
+            assert!(
+                find_matching_rule(&headers, &rules).is_none(),
+                "{ua} should NOT match"
+            );
         }
     }
 
@@ -358,7 +429,10 @@ mod tests {
         let body = fake_b64().into_bytes();
         let result = inject_links(&body, EXTRA_LINKS);
         let decoded = decode_b64(&String::from_utf8(result).unwrap());
-        assert!(decoded.contains("vless://aaaaa"), "original links preserved");
+        assert!(
+            decoded.contains("vless://aaaaa"),
+            "original links preserved"
+        );
         assert!(decoded.contains("hysteria2://"), "hysteria2 injected");
         assert!(decoded.contains("node-fi"), "first extra link present");
         assert!(decoded.contains("node-pl"), "second extra link present");
@@ -402,7 +476,8 @@ links_source = "/data/hy2.txt"
     #[tokio::test]
     async fn load_links_missing_file_returns_empty() {
         let client = reqwest::Client::new();
-        let result = load_extra_links_from_source("/tmp/definitely-does-not-exist-xyz.txt", &client).await;
+        let result =
+            load_extra_links_from_source("/tmp/definitely-does-not-exist-xyz.txt", &client).await;
         assert!(result.is_empty());
     }
 
@@ -414,13 +489,26 @@ links_source = "/data/hy2.txt"
         let links_file = write_temp_file(EXTRA_LINKS);
         let cfg = make_cfg(upstream, hy2_rules(&links_file));
 
-        for ua in &["happ/2.0", "Hiddify/1.5", "nekobox/3.0", "sing-box/1.0",
-                    "clash.meta/1.18", "mihomo/1.0", "v2rayng/1.8"] {
+        for ua in &[
+            "happ/2.0",
+            "Hiddify/1.5",
+            "nekobox/3.0",
+            "sing-box/1.0",
+            "clash.meta/1.18",
+            "mihomo/1.0",
+            "v2rayng/1.8",
+        ] {
             let (status, body) = call(build_app(cfg.clone()), "/sub/TOKEN", ua).await;
             let decoded = decode_b64(&body);
             assert_eq!(status, 200, "UA: {ua}");
-            assert!(decoded.contains("hysteria2://"), "UA {ua} should inject hysteria2");
-            assert!(decoded.contains("vless://aaaaa"), "UA {ua} should preserve original links");
+            assert!(
+                decoded.contains("hysteria2://"),
+                "UA {ua} should inject hysteria2"
+            );
+            assert!(
+                decoded.contains("vless://aaaaa"),
+                "UA {ua} should preserve original links"
+            );
         }
     }
 
@@ -430,12 +518,23 @@ links_source = "/data/hy2.txt"
         let links_file = write_temp_file(EXTRA_LINKS);
         let cfg = make_cfg(upstream, hy2_rules(&links_file));
 
-        for ua in &["Shadowrocket/1.0", "Surge/5.0", "QuantumultX", "Mozilla/5.0"] {
+        for ua in &[
+            "Shadowrocket/1.0",
+            "Surge/5.0",
+            "QuantumultX",
+            "Mozilla/5.0",
+        ] {
             let (status, body) = call(build_app(cfg.clone()), "/sub/TOKEN", ua).await;
             let decoded = decode_b64(&body);
             assert_eq!(status, 200, "UA: {ua}");
-            assert!(!decoded.contains("hysteria2://"), "UA {ua} should NOT inject");
-            assert!(decoded.contains("vless://aaaaa"), "UA {ua} should preserve original links");
+            assert!(
+                !decoded.contains("hysteria2://"),
+                "UA {ua} should NOT inject"
+            );
+            assert!(
+                decoded.contains("vless://aaaaa"),
+                "UA {ua} should preserve original links"
+            );
         }
     }
 
@@ -447,7 +546,10 @@ links_source = "/data/hy2.txt"
 
         let (status, body) = call(build_app(cfg), "/sub/TOKEN", "happ/2.0").await;
         assert_eq!(status, 200);
-        assert!(!body.contains("hysteria2://"), "yaml should never be injected");
+        assert!(
+            !body.contains("hysteria2://"),
+            "yaml should never be injected"
+        );
         assert!(body.contains("proxies:"), "yaml content should be intact");
     }
 
@@ -459,8 +561,14 @@ links_source = "/data/hy2.txt"
         let (status, body) = call(build_app(cfg), "/sub/TOKEN", "happ/2.0").await;
         let decoded = decode_b64(&body);
         assert_eq!(status, 200);
-        assert!(!decoded.contains("hysteria2://"), "no injection when file missing");
-        assert!(decoded.contains("vless://aaaaa"), "original links preserved");
+        assert!(
+            !decoded.contains("hysteria2://"),
+            "no injection when file missing"
+        );
+        assert!(
+            decoded.contains("vless://aaaaa"),
+            "original links preserved"
+        );
     }
 
     #[tokio::test]
@@ -480,10 +588,7 @@ links_source = "/data/hy2.txt"
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let port = listener.local_addr().unwrap().port();
         tokio::spawn(async move {
-            let app = Router::new().route(
-                "/links",
-                get(|| async { EXTRA_LINKS }),
-            );
+            let app = Router::new().route("/links", get(|| async { EXTRA_LINKS }));
             axum::serve(listener, app).await.unwrap();
         });
         tokio::time::sleep(tokio::time::Duration::from_millis(20)).await;
@@ -509,7 +614,10 @@ links_source = "/data/hy2.txt"
 
         let (status, body) = call(build_app(cfg), "/sub/TOKEN", "happ/2.0").await;
         assert_eq!(status, 200);
-        assert!(!body.contains("hysteria2://"), "json should never be injected");
+        assert!(
+            !body.contains("hysteria2://"),
+            "json should never be injected"
+        );
         assert!(body.contains("proxies"), "json content should be intact");
     }
 
@@ -537,7 +645,10 @@ links_source = "/data/hy2.txt"
         let resp = build_app(cfg.clone()).oneshot(req).await.unwrap();
         let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
         let decoded = decode_b64(&String::from_utf8_lossy(&bytes));
-        assert!(decoded.contains("hysteria2://"), "premium header should trigger injection");
+        assert!(
+            decoded.contains("hysteria2://"),
+            "premium header should trigger injection"
+        );
 
         // Без заголовка — нет инъекции
         let req = Request::builder()
@@ -547,7 +658,10 @@ links_source = "/data/hy2.txt"
         let resp = build_app(cfg.clone()).oneshot(req).await.unwrap();
         let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
         let decoded = decode_b64(&String::from_utf8_lossy(&bytes));
-        assert!(!decoded.contains("hysteria2://"), "missing header should not trigger injection");
+        assert!(
+            !decoded.contains("hysteria2://"),
+            "missing header should not trigger injection"
+        );
     }
 
     #[tokio::test]
@@ -563,22 +677,36 @@ links_source = "/data/hy2.txt"
         let resp = build_app(cfg).oneshot(req).await.unwrap();
         let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
         let decoded = decode_b64(&String::from_utf8_lossy(&bytes));
-        assert!(!decoded.contains("hysteria2://"), "no UA should not trigger injection");
-        assert!(decoded.contains("vless://aaaaa"), "original links preserved");
+        assert!(
+            !decoded.contains("hysteria2://"),
+            "no UA should not trigger injection"
+        );
+        assert!(
+            decoded.contains("vless://aaaaa"),
+            "original links preserved"
+        );
     }
 
     #[test]
     fn inject_links_wrapped_base64() {
         // Некоторые upstream оборачивают base64 по 76 символов
         let raw = STANDARD.encode(FAKE_LINKS.as_bytes());
-        let wrapped = raw.as_bytes().chunks(76)
+        let wrapped = raw
+            .as_bytes()
+            .chunks(76)
             .map(|c| std::str::from_utf8(c).unwrap())
             .collect::<Vec<_>>()
             .join("\n");
         let result = inject_links(wrapped.as_bytes(), EXTRA_LINKS);
         let decoded = decode_b64(&String::from_utf8(result).unwrap());
-        assert!(decoded.contains("vless://aaaaa"), "original links preserved after unwrap");
-        assert!(decoded.contains("hysteria2://"), "extra links injected after unwrap");
+        assert!(
+            decoded.contains("vless://aaaaa"),
+            "original links preserved after unwrap"
+        );
+        assert!(
+            decoded.contains("hysteria2://"),
+            "extra links injected after unwrap"
+        );
     }
 
     #[tokio::test]
@@ -664,8 +792,14 @@ links_source = "/data/hy2.txt"
             .unwrap();
         let resp = build_app(cfg).oneshot(req).await.unwrap();
         let headers = resp.headers().clone();
-        assert!(headers.get("connection").is_none(), "connection must be stripped");
-        assert!(headers.get("x-custom").is_some(), "x-custom must be preserved");
+        assert!(
+            headers.get("connection").is_none(),
+            "connection must be stripped"
+        );
+        assert!(
+            headers.get("x-custom").is_some(),
+            "x-custom must be preserved"
+        );
     }
 
     #[tokio::test]
@@ -695,11 +829,20 @@ links_source = "/data/hy2.txt"
         let (_, body) = call(build_app(cfg.clone()), "/sub/TOKEN", "hiddify/2.0").await;
         let decoded = decode_b64(&body);
         assert!(decoded.contains("hy2-node"), "hiddify should get hy2 links");
-        assert!(!decoded.contains("clash-node"), "hiddify should NOT get clash links");
+        assert!(
+            !decoded.contains("clash-node"),
+            "hiddify should NOT get clash links"
+        );
 
         let (_, body) = call(build_app(cfg.clone()), "/sub/TOKEN", "mihomo/1.0").await;
         let decoded = decode_b64(&body);
-        assert!(decoded.contains("clash-node"), "mihomo should get clash links");
-        assert!(!decoded.contains("hy2-node"), "mihomo should NOT get hy2 links");
+        assert!(
+            decoded.contains("clash-node"),
+            "mihomo should get clash links"
+        );
+        assert!(
+            !decoded.contains("hy2-node"),
+            "mihomo should NOT get hy2 links"
+        );
     }
 }

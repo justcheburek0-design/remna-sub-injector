@@ -33,7 +33,7 @@
 **Шаг 1.** Склонируйте репозиторий:
 
 ```bash
-git clone https://github.com/itwormz/remna-sub-injector /opt/remna-sub-injector
+git clone https://github.com/justcheburek0-design/remna-sub-injector /opt/remna-sub-injector
 cd /opt/remna-sub-injector
 ```
 
@@ -47,7 +47,7 @@ case $ARCH in
   aarch64) BINARY="sub-injector-linux-aarch64" ;;
   *) echo "Unsupported architecture: $ARCH"; exit 1 ;;
 esac
-curl -L https://github.com/itwormz/remna-sub-injector/releases/latest/download/${BINARY} \
+curl -L https://github.com/justcheburek0-design/remna-sub-injector/releases/latest/download/${BINARY} \
   -o bin/sub-injector
 chmod +x bin/sub-injector
 ```
@@ -103,7 +103,7 @@ case $ARCH in
   aarch64) BINARY="sub-injector-linux-aarch64" ;;
   *) echo "Unsupported architecture: $ARCH"; exit 1 ;;
 esac
-curl -L https://github.com/itwormz/remna-sub-injector/releases/latest/download/${BINARY} \
+curl -L https://github.com/justcheburek0-design/remna-sub-injector/releases/latest/download/${BINARY} \
   -o /usr/local/bin/sub-injector
 chmod +x /usr/local/bin/sub-injector
 ```
@@ -114,7 +114,7 @@ chmod +x /usr/local/bin/sub-injector
 
 ```bash
 mkdir -p /opt/remna-sub-injector
-curl -L https://github.com/itwormz/remna-sub-injector/releases/latest/download/config.toml.example \
+curl -L https://github.com/justcheburek0-design/remna-sub-injector/releases/latest/download/config.toml.example \
   -o /opt/remna-sub-injector/config.toml
 ```
 
